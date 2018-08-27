@@ -37,17 +37,9 @@
            (D A B)
            (E))))
 
-;; --------
 
-;; read-file :: (U File String) -> Graph
-;; converts a file of s-expression represented graph
-;; to the host graph representation
-(define (read-graph st)
-  ;; input : String
-  (define input (read st))
-  (graph
-   (for/list ([e input])
-     (cons (car e) (cadr e)))))
+
+;; --------
 
 ;; graph=? : Graph -> Graph -> Boolean
 ;; checks for equality between graphs by checking for
@@ -55,8 +47,32 @@
 (define (graph=? G1 G2)
   (equal? (graph-edges G1) (graph-edges G2)))
 
+(check-false (graph=? (graph '((A B C)
+                               (B)
+                               (C)))
+                      (graph '((A B C)
+                               (B C)
+                               (C)))))
+
+(check-true (graph=? (graph '((A B C)
+                              (B C)
+                              (C)))
+                     (graph '((A B C)
+                              (B C)
+                              (C)))))
+
+
+;; read-file :: (U File String) -> Graph
+;; converts a file of s-expression represented graph
+;; to the host graph representation
+(define (read-graph st)
+  (graph
+   (for/list ([e (read st)])
+     (cons (car e) (cadr e)))))
+
 (check graph=? (read-graph (open-input-file "graph-test-fixtures")) triangle)
 (check graph=? (read-graph (open-input-file "graph-test-fixtures2")) 7verts)
+
 
 ;; ----
 ;; Printing Graphs
@@ -68,30 +84,35 @@
 (define (slice lst start end)
   (take (drop lst start) (- end start)))
 
+(check-equal? (slice '(1 2 3 4) 2 4) '(3 4))
+(check-equal? (slice '(1 2 3 4) 1 3) '(2 3))
+(check-equal? (slice '(1 2 3 4) 0 2) '(1 2))
+
 
 ;; print-graph : Graph -> Void
 ;; prints the graph in s-exp form as desired from course webpage
 (define print-graph
   (λ (G)
     (define data (graph-edges G))
-    (define final (last data))
-
+    (define (fixup x)
+      (cons (car x) (list (cdr x))))
+    
     (display "(")
-    (displayln (cons (caar data) (list (cdar data))))
+    (displayln (fixup (car data)))
 
     (for ([i (slice data 1 (- (length data) 1))])
       (display " ")
-      (displayln (cons (car i) (list (cdr i)))))
+      (displayln (fixup i)))
 
     (display " ")
-    (display (cons (car final) (list (cdr final))))
+    (display (fixup (last data)))
     (displayln ")")))
 
 ;; spanning-tree : Graph -> Graph
 ;; returns a graph with the same amount of vertices, but
 ; edges are minimized to only the essentials needed to traverse the graph 
 (define (spanning-tree G)
-  (define seen `(,(caar (graph-edges G))))
+  (define seen (list (caar (graph-edges G))))
   (graph (for/list ([i (graph-edges G)])
            (cons (car i)
                  (for/list ([vt (cdr i)] #:when (not (memv vt seen)))
@@ -102,18 +123,3 @@
 (check-equal? (graph-edges (spanning-tree 7verts)) '((A B C D) (B E) (C) (D F) (E) (F)))
 (check-equal? (graph-edges (spanning-tree G2)) '((A C D) (B E) (C) (D B) (E)))
 
-
-#| Old code, may become useful when we try
-   a more racket//idiomatic approach to printing graphs
-
-(define (graph-write graph port mode)
-  (write-string "(" port)
-  (for ([e (graph-edges graph)])
-    (write-string (format "~a\n" (cons (car e) (list (cdr e))))))
-  (write-string ")" port))
-
-
-(struct graph [edges]
-  #:methods gen:custom-write
-  ((define write-proc graph-write)))
-|#
