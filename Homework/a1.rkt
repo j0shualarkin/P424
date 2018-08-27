@@ -11,7 +11,7 @@
 ;; A Graph is a [List [List Symbol]]
 ;; the first Symbol in the list is the domain vertice
 ;; the succeeding symbols are the vertices with edges
-;; from the domain vertices 
+;; from the domain vertices
 (struct graph [edges])
 
 ;; Sample Graphs
@@ -43,7 +43,7 @@
 
 ;; graph=? : Graph -> Graph -> Boolean
 ;; checks for equality between graphs by checking for
-;; equality between the list of vertices in the graphs 
+;; equality between the list of vertices in the graphs
 (define (graph=? G1 G2)
   (equal? (graph-edges G1) (graph-edges G2)))
 
@@ -94,23 +94,16 @@
 (define print-graph
   (λ (G)
     (define data (graph-edges G))
-    (define (fixup x)
-      (cons (car x) (list (cdr x))))
-    
-    (display "(")
-    (displayln (fixup (car data)))
+    (pretty-print-columns 20)
+    (pretty-print
+     (for/list ([i data])
+       (cons (car i) (list (cdr i)))))))
 
-    (for ([i (slice data 1 (- (length data) 1))])
-      (display " ")
-      (displayln (fixup i)))
 
-    (display " ")
-    (display (fixup (last data)))
-    (displayln ")")))
-
+(print-graph 7verts)
 ;; spanning-tree : Graph -> Graph
 ;; returns a graph with the same amount of vertices, but
-; edges are minimized to only the essentials needed to traverse the graph 
+; edges are minimized to only the essentials needed to traverse the graph
 (define (spanning-tree G)
   (define seen (list (caar (graph-edges G))))
   (graph (for/list ([i (graph-edges G)])
@@ -122,4 +115,3 @@
 (check-equal? (graph-edges (spanning-tree triangle)) '((A B C) (B) (C)))
 (check-equal? (graph-edges (spanning-tree 7verts)) '((A B C D) (B E) (C) (D F) (E) (F)))
 (check-equal? (graph-edges (spanning-tree G2)) '((A C D) (B E) (C) (D B) (E)))
-
