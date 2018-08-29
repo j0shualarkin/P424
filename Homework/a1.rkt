@@ -70,37 +70,20 @@
    (for/list ([e (read st)])
      (cons (car e) (cadr e)))))
 
-(check graph=? (read-graph (open-input-file "graph-test-fixtures")) triangle)
-(check graph=? (read-graph (open-input-file "graph-test-fixtures2")) 7verts)
-
-
 ;; ----
 ;; Printing Graphs
 ;; ----
-
-;; slice : Number -> Number -> Number -> List
-;; helper function for printing,
-;; allows for printing of sets of vertices that arent the first set nor the last
-(define (slice lst start end)
-  (take (drop lst start) (- end start)))
-
-(check-equal? (slice '(1 2 3 4) 2 4) '(3 4))
-(check-equal? (slice '(1 2 3 4) 1 3) '(2 3))
-(check-equal? (slice '(1 2 3 4) 0 2) '(1 2))
-
 
 ;; print-graph : Graph -> Void
 ;; prints the graph in s-exp form as desired from course webpage
 (define print-graph
   (λ (G)
     (define data (graph-edges G))
-    (pretty-print-columns 20)
-    (pretty-print
-     (for/list ([i data])
-       (cons (car i) (list (cdr i)))))))
+    (parameterize ([pretty-print-columns 20])
+      (pretty-print
+       (for/list ([i data])
+         (cons (car i) (list (cdr i))))))))
 
-
-(print-graph 7verts)
 ;; spanning-tree : Graph -> Graph
 ;; returns a graph with the same amount of vertices, but
 ; edges are minimized to only the essentials needed to traverse the graph
@@ -112,6 +95,14 @@
                    (begin (set! seen (cons vt seen))
                           vt))))))
 
-(check-equal? (graph-edges (spanning-tree triangle)) '((A B C) (B) (C)))
-(check-equal? (graph-edges (spanning-tree 7verts)) '((A B C D) (B E) (C) (D F) (E) (F)))
-(check-equal? (graph-edges (spanning-tree G2)) '((A C D) (B E) (C) (D B) (E)))
+
+(module+ test
+  (check graph=? (read-graph (open-input-file "graph-test-fixtures")) triangle)
+  (check graph=? (read-graph (open-input-file "graph-test-fixtures2")) 7verts)
+  (check-equal? (graph-edges (spanning-tree triangle)) '((A B C) (B) (C)))
+  (check-equal? (graph-edges (spanning-tree 7verts)) '((A B C D) (B E) (C) (D F) (E) (F)))
+  (check-equal? (graph-edges (spanning-tree G2)) '((A C D) (B E) (C) (D B) (E)))
+  (check-equal? (with-output-to-string
+                (λ _
+                  (print-graph 7verts)))
+              "'((A (B C D))\n  (B (E C))\n  (C ())\n  (D (C F))\n  (E ())\n  (F (E)))\n"))
