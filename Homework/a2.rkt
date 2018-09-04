@@ -164,24 +164,7 @@
     [(list e ...) (map (lambda (e) (subst x v e)) e)]
     [_ s]))
 
-#;
-(interp '(list 1 2 3))
-#;
-(interp ''(1 2 3))
-
-#;
-(interp '((lambda (x) x) (list 1 2 3)))
-
-#;
-(interp '(null? '()))
-
-
-;; (letrec ([sum (λ (x)
-;;                 (displayln x)
-;;                 (if (zero? x) 0
-;;                     (+ x (sum (- x 1)))))])
-;;   (sum 10))
-
+(interp '((lambda (x) x) 5))
 (module+ test
   (require rackunit)
   (check-equal? (interp '(let ([x 1]) (or x (+ x 2)))) 1)
