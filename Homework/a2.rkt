@@ -29,7 +29,7 @@
     [(? number?) s]
     [(? symbol?) s]
     [`(lambda (,v) ,body)
-     `(lambda (,v) ,(expand body))]
+    `(lambda (,v) ,(expand body))]
     [`(if ,tst ,thn ,els)
      `(if ,(expand tst) ,(expand thn) ,(expand els))]
     [`(,(? macro? m) ,operand ...)
@@ -53,9 +53,18 @@
 (extend-syntax! 'let
                 (λ (s)
                   (match s
-                     [`(let ((,x ,v)) ,b)
+                    [`(let ((,x ,v)) ,b)
                       `((lambda (,x) ,b) ,v)])))
 
+(extend-syntax! 'cond
+                (λ (s)
+                  (match s
+                    [`(cond) `(void)]
+                    [`(cond [else ,at]) at]
+                    [`(cond [,a ,at] . ,c)
+                     `(if ,a ,at
+                          (cond . ,c))]
+                    )))
 
 
 (define (interp s)
@@ -86,10 +95,12 @@
     [_ s]))
 
 
-(interp '(let ([x 1]) (or x (+ x 2))))
-
-
-
-(interp '((lambda (x) (or x 2 y)) 0))
-
-(interp `(let ([x 10]) (or 0 x)))
+(module+ test
+  (require rackunit)
+  (check-equal? (interp '(let ([x 1]) (or x (+ x 2)))) 1)
+  (check-equal? (interp '((lambda (x) (or x 2 y)) 0)) 2)
+  (check-equal? (interp `(let ([x 10]) (or 0 x))) 0) ;; our macro expander is not hygienic. x in the expander captures the x variable here
+  (check-equal? (interp `(cond [1 2]
+                               [0 3])) 2)
+  (check-equal? (interp `(cond [0 2]
+                               [else 3])) 3))
