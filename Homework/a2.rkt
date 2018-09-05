@@ -164,12 +164,11 @@
     [(list e ...) (map (lambda (e) (subst x v e)) e)]
     [_ s]))
 
-(interp '((lambda (x) x) 5))
 (module+ test
   (require rackunit)
   (check-equal? (interp '(let ([x 1]) (or x (+ x 2)))) 1)
   (check-equal? (interp '((lambda (x) (or x 2 y)) 0)) 2)
-  (check-equal? (interp `(let ([x 10]) (or 0 x))) 0) ;; our macro expander is not hygienic. x in the expander captures the x variable here
+  (check-equal? (interp `(let ([x 10]) (or 0 x))) 0)
   (check-equal? (interp `(cond [1 2]
                                [0 3])) 2)
   (check-equal? (interp `(cond [0 2]
