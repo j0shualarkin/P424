@@ -7,7 +7,7 @@
 ;; ----------------------------------------------
 
 (define-syntax and2
-  (syntax-parser 
+  (syntax-parser
     ((_ a b) #'(if a (if b #t #f) #f))))
 
 (define-syntax and*
@@ -139,28 +139,21 @@
 ;; =======
 
 (define-syntax cond2
-  (syntax-parser 
-    ((_ [Q E]) #'(if (equal? (syntax-e Q) 'else*)
-                        E
+  (syntax-parser
+    ((_ [Q E]) (if (equal? (syntax-e #'Q) 'else)
+                        #'E
                         #'(if Q E (raise-syntax-error 'cond "no cond clauses matched"))))
     ((_ [Q C]
-        [Q2 C2]
-        ...) #'(if Q C (cond1 [Q2 C2] ...)))))
+        [Q2 C2] ...)  #'(if Q C (cond2 [Q2 C2] ...)))))
 
+(cond2
+  [#f 10]
+  [#t 11]
+  [else 12])
+#;
 (check-equal?
  (cond2
   [#f 10]
   [#f 11]
   [else* 12])
  12)
-
-
-
-
-
-
-
-
-
-
-
