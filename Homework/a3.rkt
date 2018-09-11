@@ -57,6 +57,7 @@
 (require (for-syntax syntax/parse
                      racket/match
                      racket/bool))
+#;
 (define-syntax all
   (syntax-parser
     [(_ e)
@@ -73,7 +74,39 @@
           #`(let ([v1 e1]
                   [vr rec])
               (if vr (cons v1 vr) #f)))])]))
+#;
+(define-syntax (all0 stx)
+  (syntax-parse stx
+    [(_ e) #'(let ([v e])
+               (if v (list v)
+                   (list #f)))]
+    [(_ e1 e ...)
+     #'(let ([v1 e1])
+         (if v1
+             (cons v1 (all0 e ...))
+             (list #f)))]))
 
+#;
+(define-syntax all
+  (syntax-parser
+    [(_ stx ...) #`(let ([v (all0 stx ...)])
+                     (if (last v) (filter (λ (a) (not (eqv? a #t))) v)
+                         #f))]))
+
+(define-syntax all-
+  (syntax-parser
+    [(_ acc) #'acc]
+    [(_ acc e1 e ...) #'(let ([v1 e1])
+                          (if v1
+                              (all- (if (eq? v1 #t) acc
+                                        (append acc (list v1)))
+                                    e ...)
+                              #f))]))
+
+(define-syntax-rule (all e ...)
+  (all- '() e ...))
+#;
+(all #t #t #t #f (begin (displayln "heheh") 20))
 ;; had to comment this test out since
 ;; function equality isn't easy to check
 ;; but it says there's a procedure in the right place,
