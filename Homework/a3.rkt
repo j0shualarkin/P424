@@ -57,7 +57,6 @@
 (require (for-syntax syntax/parse
                      racket/match
                      racket/bool))
-
 (define-syntax all
   (syntax-parser
     [(_ e)
@@ -71,8 +70,9 @@
        [#f #'#f]
        [_
         (with-syntax ([rec #'(all e2 ...)])
-          #`(let ([v rec])
-              (if v (cons e1 v) #f)))])]))
+          #`(let ([v1 e1]
+                  [vr rec])
+              (if vr (cons v1 vr) #f)))])]))
 
 ;; had to comment this test out since
 ;; function equality isn't easy to check
@@ -104,7 +104,6 @@
                        li)
                      (begin
                        (set! li (cons 'b li))
-                       (displayln li)
                        li))
                 '((a) (b a)))
 
