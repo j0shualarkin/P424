@@ -92,7 +92,7 @@
     [(_ stx ...) #`(let ([v (all0 stx ...)])
                      (if (last v) (filter (λ (a) (not (eqv? a #t))) v)
                          #f))]))
-
+#;
 (define-syntax all-
   (syntax-parser
     [(_ acc) #'acc]
@@ -102,9 +102,22 @@
                                         (append acc (list v1)))
                                     e ...)
                               #f))]))
-
+#;
 (define-syntax-rule (all e ...)
   (all- '() e ...))
+
+(define-syntax all
+  (syntax-parser
+    [(_ e ...) #'(let ([v #t]
+                       [result '()])
+                   (if v (begin
+                           (set! v e)
+                           (when (and v (not (eq? v #t)))
+                             (set! result (append result (list v)))))
+                       #f)
+                   ...
+                   (if v result #f))]))
+
 #;
 (all #t #t #t #f (begin (displayln "heheh") 20))
 ;; had to comment this test out since
