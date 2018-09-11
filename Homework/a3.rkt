@@ -98,9 +98,15 @@
 
   (define li (list))
 
-  (check-equal? (all #t (begin
-                          (set! li (cons 'a li))
-                          li)) '((a)))
+  (check-equal? (all #t
+                     (begin
+                       (set! li (cons 'a li))
+                       li)
+                     (begin
+                       (set! li (cons 'b li))
+                       (displayln li)
+                       li))
+                '((a) (b a)))
 
   (check-equal? (all #t #f)
                 #f)
