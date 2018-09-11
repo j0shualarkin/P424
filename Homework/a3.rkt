@@ -96,6 +96,12 @@
    (all 42)
    (list 42))
 
+  (define li (list))
+
+  (check-equal? (all #t (begin
+                          (set! li (cons 'a li))
+                          li)) '((a)))
+
   (check-equal? (all #t #f)
                 #f)
 
