@@ -117,7 +117,6 @@
                        #f)
                    ...
                    (if v result #f))]))
-
 #;
 (all #t #t #t #f (begin (displayln "heheh") 20))
 ;; had to comment this test out since
@@ -250,4 +249,26 @@
     [(_ struct-name ({field1 : pred1}))
      (define (struct-name a)
        (if (pred1 a) (begin (struct struct-name (field1))
+
                             (struct-name a))))]))
+
+#;
+(define-syntax loop
+  (syntax-parser
+    [(k e ...)
+     #'(let f () e ... (f))]))
+
+(all)
+
+(define-syntax (struct/con stx)
+  (syntax-parse stx
+    [(_ struct-name ({f1 p1} {f2 p2}))
+     #`(define-syntax (struct-name stx)
+         (syntax-parse stx
+           [(_ v1 v2) #`(begin (if (and (p1 v1) (p2 v2))
+                                   (list (quote struct-name) v1 v2)
+                                   (error "some error")))]))
+     ]))
+(struct/con abc ({ x zero?} {y zero?}))
+(abc 0 0)
+(abc 1 0)
