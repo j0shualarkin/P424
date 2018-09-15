@@ -166,6 +166,7 @@
 
 
 
+
 ;; ========================================================
 
 
@@ -242,43 +243,33 @@
 ;; (kons knil knil)
 ;; (kons 5 'dogs)
 
-#;
-(define-syntax struct/con
-  (syntax-parser
-    [(_ struct-name ()) #'(struct struct-name ())]
-    [(_ struct-name ({field1 : pred1}))
-     (define (struct-name a)
-       (if (pred1 a) (begin (struct struct-name (field1))
-
-                            (struct-name a))))]))
-
-#;
-(define-syntax loop
-  (syntax-parser
-    [(k e ...)
-     #'(let f () e ... (f))]))
-
-(all)
-(struct joshua [])
 
 (define-for-syntax (accessify stx snme fnme)
-  (datum->syntax stx
-                 (string->symbol
-                  (string-append (symbol->string (syntax->datum snme))
-                                 "-"
-                                 (symbol->string (syntax->datum fnme))))))
+  (map
+   (λ (fnme indx)
+     (define field-getter (datum->syntax stx
+                                         (string->symbol
+                                          (string-append (symbol->string (syntax->datum snme))
+                                                         "-"
+                                                         (symbol->string (syntax->datum fnme))))))
+     #`(define 
+         #,field-getter
+         (λ (inst) (list-ref inst (add1 #,indx)))))
+   (syntax->list fnme)
+   (for/list ([s (length (syntax->list fnme))])
+     s)))
 
 
 (define-syntax (struct/con stx)
   (syntax-parse stx #:datum-literals (:)
     [(_ struct-name ({f1 : p1} ...))
-
+     
      (define ps (map syntax->datum (syntax->list #'(p1 ...))))
      (define ps-len (length ps))
 
      (define vs
        (for/list ([i ps-len])
-         (string->symbol (string-append "v" (number->string i)))))
+         (string->symbol (string-append "v-" (number->string i)))))
 
      (define vs-stx (datum->syntax #'struct-name vs))
 
@@ -288,11 +279,11 @@
                   (if b? b? (error 'struct/con "expr ~v did not pass predicate ~v" #,v #,p))))
             ps
             (syntax->list vs-stx)))
+
+     (define accessors (accessify stx #'struct-name #'(f1 ...)))
      
      #`(begin
-           #;(define #,f1-name cadr)
-           #;(define #,f2-name caddr)
-           
+         #,@accessors
            (define-syntax (struct-name stx)
                (syntax-parse stx
                  [(struct-name #,@vs-stx)
@@ -304,12 +295,21 @@
 
 
 
-(struct/con abc ({x : zero?} {y : zero?}))
 
-(abc 0 0)
-#;(abc 0 1)
+(module+ test
+  (struct/con abc ({x : zero?} {y : symbol?}))
+
+  (define ex (abc 0 'x))
 
 
+  (struct/con abcd ({x : zero?}
+                    {y : symbol?}
+                    {z : string?}))
+
+  (define ex2 (abcd 0 'z "dogs"))
+  (check-equal? (abcd-x ex2) 0)
+  (check-equal? (abcd-y ex2) 'z)
+  (check-equal? (abcd-z ex2) "dogs"))
 
 
 ;; for making accessors later
