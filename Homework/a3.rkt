@@ -275,8 +275,8 @@
 
      (define rands
        (map (λ (p v)
-              #`(let ([b? (#,p #,v)])
-                  (if b? b? (error 'struct/con "expr ~v did not pass predicate ~v" #,v #,p))))
+              #`(or (#,p #,v)
+                    (error 'struct/con "expr ~v did not pass predicate ~v" #,v #,p)))
             ps
             (syntax->list vs-stx)))
 
@@ -298,8 +298,18 @@
 
 (module+ test
   (struct/con abc ({x : zero?} {y : symbol?}))
-
+  #;(define non-ex (abc 1 'z))
+  
   (define ex (abc 0 'x))
+
+  (check-exn (regexp "struct/con: expr 0 did not pass predicate #<procedure:symbol\\?>")
+             (λ () (abc 0 0)))
+
+  (check-exn (regexp "struct/con: expr 1 did not pass predicate #<procedure:zero\\?>")
+             (λ () (abc 1 0)))
+  
+  (check-exn (regexp "struct/con: expr 1 did not pass predicate #<procedure:zero\\?>")
+             (λ () (abc 1 'z)))
 
 
   (struct/con abcd ({x : zero?}
@@ -307,30 +317,11 @@
                     {z : string?}))
 
   (define ex2 (abcd 0 'z "dogs"))
+
+  (check-exn (regexp "struct/con: expr 120 did not pass predicate #<procedure:string\\?>")
+             (λ () (abcd 0 'a 120)))
+  
   (check-equal? (abcd-x ex2) 0)
   (check-equal? (abcd-y ex2) 'z)
   (check-equal? (abcd-z ex2) "dogs"))
 
-
-;; for making accessors later
-
-
-#;(let ([f1-name (accessify stx #'struct-name #'f1)])
-    (let ([f2-name (accessify stx #'struct-name #'f2)])
-      #`(begin
-          (define #,f1-name cadr)
-          (define #,f2-name caddr)
-          (define-syntax (struct-name stx)
-            (syntax-parse stx
-              [(struct-name v1 v2 ...)
-               #`(if (foo #'(v2 ...))
-                     #;(and (p1 v1) (p2 v2))
-                     (list (quote struct-name) v1 v2)
-                     (error
-                      'struct/con "arguments ~v ~v did not pass their predicates ~v ~v"
-                      (syntax->datum #'v1) (syntax->datum #'v2)
-                      (syntax->datum #'p1) (syntax->datum #'p2)))])))))
-
-#;#;
-(abc-x (abc 0 0))
-(abc-y (abc 0 0))
