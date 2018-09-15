@@ -259,16 +259,42 @@
      #'(let f () e ... (f))]))
 
 (all)
+(struct joshua [])
+
+(define-for-syntax (accessify stx snme fnme)
+  (datum->syntax stx
+                 (string->symbol
+                  (string-append (symbol->string (syntax->datum snme))
+                                 "-"
+                                 (symbol->string (syntax->datum fnme))))))
 
 (define-syntax (struct/con stx)
-  (syntax-parse stx
-    [(_ struct-name ({f1 p1} {f2 p2}))
-     #`(define-syntax (struct-name stx)
-         (syntax-parse stx
-           [(_ v1 v2) #`(begin (if (and (p1 v1) (p2 v2))
-                                   (list (quote struct-name) v1 v2)
-                                   (error "some error")))]))
-     ]))
-(struct/con abc ({ x zero?} {y zero?}))
+  (syntax-parse stx #:datum-literals (:)
+    [(_ struct-name ({f1 : p1} {f2 : p2}))
+     (let ([f1-name (accessify stx #'struct-name #'f1)])
+       (let ([f2-name (accessify stx #'struct-name #'f2)])
+         #`(begin
+           (define #,f1-name cadr)
+           (define #,f2-name caddr)
+           (define-syntax (struct-name stx)
+               (syntax-parse stx
+                 [(struct-name v1 v2)
+                  #`(if (and (p1 v1) (p2 v2))
+                        (list (quote struct-name) v1 v2)
+                        (error
+                         'struct/con "arguments ~v ~v did not pass their predicates ~v ~v"
+                         (syntax->datum #'v1) (syntax->datum #'v2)
+                         (syntax->datum #'p1) (syntax->datum #'p2)))])))))
+
+     
+     ]
+    ))
+
+(struct/con abc ({x : zero?} {y : zero?}))
 (abc 0 0)
-(abc 1 0)
+
+(abc-x (abc 0 0))
+(abc-y (abc 0 0))
+
+
+
