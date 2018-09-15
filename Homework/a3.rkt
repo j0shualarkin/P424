@@ -273,63 +273,64 @@
   (syntax-parse stx #:datum-literals (:)
     [(_ struct-name ({f1 : p1} ...))
 
-     (define ps (syntax->list #'(p1 ...)))
+     (define ps (map syntax->datum (syntax->list #'(p1 ...))))
      (define ps-len (length ps))
 
      (define vs
        (for/list ([i ps-len])
          (string->symbol (string-append "v" (number->string i)))))
-     (define vs-stx (datum->syntax #'struct-name vs))
-     #;
-     (define (foo ps vs)
-       (all (map (λ (p v)
-                   ((syntax->datum p) (syntax->datum v)))
-                 ps
-                 vs)))
 
-     (displayln vs-stx)
+     (define vs-stx (datum->syntax #'struct-name vs))
+
+     (define rands
+       (map (λ (p v)
+              #`(let ([b? (#,p #,v)])
+                  (if b? b? (error 'struct/con "expr ~v did not pass predicate ~v" #,v #,p))))
+            ps
+            (syntax->list vs-stx)))
+     
      #`(begin
            #;(define #,f1-name cadr)
            #;(define #,f2-name caddr)
            
            (define-syntax (struct-name stx)
                (syntax-parse stx
-                 [(struct-name #,@vs-stx) 
-                  #'(list (quote struct-name) #,@vs-stx)
-                  
-                  #;#`(if (foo #'(v2 ...))
-                        #;(and (p1 v1) (p2 v2))
-                        (list (quote struct-name) v1 v2)
-                        (error
-                         'struct/con "arguments ~v ~v did not pass their predicates ~v ~v"
-                         (syntax->datum #'v1) (syntax->datum #'v2)
-                         (syntax->datum #'p1) (syntax->datum #'p2)))])))
+                 [(struct-name #,@vs-stx)
+                  #'(when (and #,@rands)
+                      (list (quote struct-name) #,@vs-stx))])))
 
-
-     #;(let ([f1-name (accessify stx #'struct-name #'f1)])
-       (let ([f2-name (accessify stx #'struct-name #'f2)])
-         #`(begin
-           (define #,f1-name cadr)
-           (define #,f2-name caddr)
-           (define-syntax (struct-name stx)
-               (syntax-parse stx
-                 [(struct-name v1 v2 ...)
-                  #`(if (foo #'(v2 ...))
-                        #;(and (p1 v1) (p2 v2))
-                        (list (quote struct-name) v1 v2)
-                        (error
-                         'struct/con "arguments ~v ~v did not pass their predicates ~v ~v"
-                         (syntax->datum #'v1) (syntax->datum #'v2)
-                         (syntax->datum #'p1) (syntax->datum #'p2)))])))))]))
+]))
 
 
 
 
 (struct/con abc ({x : zero?} {y : zero?}))
+
 (abc 0 0)
+#;(abc 0 1)
+
+
+
+
+;; for making accessors later
+
+
+#;(let ([f1-name (accessify stx #'struct-name #'f1)])
+    (let ([f2-name (accessify stx #'struct-name #'f2)])
+      #`(begin
+          (define #,f1-name cadr)
+          (define #,f2-name caddr)
+          (define-syntax (struct-name stx)
+            (syntax-parse stx
+              [(struct-name v1 v2 ...)
+               #`(if (foo #'(v2 ...))
+                     #;(and (p1 v1) (p2 v2))
+                     (list (quote struct-name) v1 v2)
+                     (error
+                      'struct/con "arguments ~v ~v did not pass their predicates ~v ~v"
+                      (syntax->datum #'v1) (syntax->datum #'v2)
+                      (syntax->datum #'p1) (syntax->datum #'p2)))])))))
+
 #;#;
-(abc-x (abc 0))
-(abc-y (abc 1))
-
-
-
+(abc-x (abc 0 0))
+(abc-y (abc 0 0))
