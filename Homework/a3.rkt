@@ -274,9 +274,11 @@
      (define vs-stx (datum->syntax #'struct-name vs))
 
      (define rands
-       (map (λ (p v)
-              #`(or (#,p #,v)
-                    (error 'struct/con "expr ~v did not pass predicate ~v" #,v #,p)))
+       (map (λ (p e)
+              #`(or (let ([v #,e])
+                      (if (#,p v) v
+                          #f))
+                    (error 'struct/con "expr ~v did not pass predicate ~v" #,e #,p)))
             ps
             (syntax->list vs-stx)))
 
@@ -287,21 +289,39 @@
            (define-syntax (struct-name stx)
                (syntax-parse stx
                  [(struct-name #,@vs-stx)
-                  #'(when (and #,@rands)
-                      (list (quote struct-name) #,@vs-stx))])))
+                  #'(list (quote struct-name) #,@rands) ])))
 
 ]))
 
 
 
+;(struct/con interesting-example ({f1 : number?}))
+;(interesting-example (begin (displayln 'once)
+;                            10))
 
 
 (module+ test
   (struct/con abc ({x : zero?} {y : symbol?}))
   #;(define non-ex (abc 1 'z))
+
+  
   
   (define ex (abc 0 'x))
-
+  
+  (struct/con eval-once-test ({xs : list?} {ys : list?}))
+  
+  (define my-xs '())
+  
+  (check-equal?
+   (eval-once-test (begin
+                     (set! my-xs (cons 'a my-xs))
+                     my-xs)
+                   (begin
+                     (set! my-xs (cons 'b my-xs))
+                     my-xs))
+   '(eval-once-test (a) (b a)))
+  
+  
   (check-exn (regexp "struct/con: expr 0 did not pass predicate #<procedure:symbol\\?>")
              (λ () (abc 0 0)))
 
