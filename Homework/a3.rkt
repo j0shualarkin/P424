@@ -117,6 +117,8 @@
                        #f)
                    ...
                    (if v result #f))]))
+
+
 #;
 (all #t #t #t #f (begin (displayln "heheh") 20))
 ;; had to comment this test out since
@@ -271,14 +273,14 @@
      s)))
 
 
-#;
+
 (define-for-syntax (make-struct-pred stx snme ps)
   (define predicate (string->syntax (string-append (syntax->string snme) "?") stx))
   #`(define #,predicate
-      (λ (s) (and (eqv? (syntax->datum #,snme) (car s))
-                  (for/list ([field (cdr s)]
-                             [p ps])
-                    ((syntax->datum p) (syntax->datum field)))))))
+      (λ (s) (and (eqv? #,snme (car s))
+                  (for ([field (cdr s)]
+                        [p ps])
+                    (p field))))))
 
 
 (define-syntax (struct/con stx)
@@ -303,11 +305,11 @@
             ps
             (syntax->list vs-stx)))
 
-     ;(define predicate (make-struct-pred stx #'struct-name #'(p1 ...)))
+     (define predicate (make-struct-pred stx #'struct-name #'(p1 ...)))
      (define accessors (accessify        stx #'struct-name #'(f1 ...)))
      
      #`(begin
-       ;  #,predicate
+        #,predicate
          #,@accessors
            (define-syntax (struct-name stx)
                (syntax-parse stx
@@ -322,9 +324,11 @@
 
 
 (module+ test
-  ;(struct/con pair ({m : number?} {n : number?}))
-  ;(pair? (pair 1 0))
-  ;(pair? (pair 'x 0))
+  (struct/con pair ({m : number?} {n : number?}))
+  (check-equal? (pair? (pair 1 0)) #t)
+  (check-equal? (pair? `(pair 2 2)) #f)
+  (check-exn (regexp "struct/con: expr 'x did not pass predicate #<procedure:number\\?>")
+              (λ () (pair? (pair 'x 0))))
 
   (struct/con abc ({x : zero?} {y : symbol?}))
   #;(define non-ex (abc 1 'z))
