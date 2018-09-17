@@ -167,6 +167,9 @@
 
 
 
+
+
+
 ;; ========================================================
 
 
@@ -243,21 +246,39 @@
 ;; (kons knil knil)
 ;; (kons 5 'dogs)
 
+(define-for-syntax (syntax->string stx)
+  (symbol->string (syntax->datum stx)))
+
+(define-for-syntax (string->syntax str stx)
+  (datum->syntax stx (string->symbol str)))
+
 
 (define-for-syntax (accessify stx snme fnme)
+  (define ls-stx (syntax->list fnme))
   (map
    (λ (fnme indx)
-     (define field-getter (datum->syntax stx
-                                         (string->symbol
-                                          (string-append (symbol->string (syntax->datum snme))
-                                                         "-"
-                                                         (symbol->string (syntax->datum fnme))))))
+     (define field-getter
+       (string->syntax (string-append (syntax->string snme) "-"
+                                      (syntax->string fnme))
+                       stx))
      #`(define 
          #,field-getter
          (λ (inst) (list-ref inst (add1 #,indx)))))
-   (syntax->list fnme)
-   (for/list ([s (length (syntax->list fnme))])
+   ;; field names
+   ls-stx
+   ;; indices
+   (for/list ([s (length ls-stx)])
      s)))
+
+
+#;
+(define-for-syntax (make-struct-pred stx snme ps)
+  (define predicate (string->syntax (string-append (syntax->string snme) "?") stx))
+  #`(define #,predicate
+      (λ (s) (and (eqv? (syntax->datum #,snme) (car s))
+                  (for/list ([field (cdr s)]
+                             [p ps])
+                    ((syntax->datum p) (syntax->datum field)))))))
 
 
 (define-syntax (struct/con stx)
@@ -282,16 +303,16 @@
             ps
             (syntax->list vs-stx)))
 
-     (define accessors (accessify stx #'struct-name #'(f1 ...)))
+     ;(define predicate (make-struct-pred stx #'struct-name #'(p1 ...)))
+     (define accessors (accessify        stx #'struct-name #'(f1 ...)))
      
      #`(begin
+       ;  #,predicate
          #,@accessors
            (define-syntax (struct-name stx)
                (syntax-parse stx
                  [(struct-name #,@vs-stx)
-                  #'(list (quote struct-name) #,@rands) ])))
-
-]))
+                  #'(list (quote struct-name) #,@rands)])))]))
 
 
 
@@ -301,6 +322,10 @@
 
 
 (module+ test
+  ;(struct/con pair ({m : number?} {n : number?}))
+  ;(pair? (pair 1 0))
+  ;(pair? (pair 'x 0))
+
   (struct/con abc ({x : zero?} {y : symbol?}))
   #;(define non-ex (abc 1 'z))
 
