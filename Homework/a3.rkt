@@ -168,13 +168,7 @@
 
 
 
-
-
-
-
 ;; ========================================================
-
-
 
 
 ;
@@ -195,24 +189,6 @@
 ;                                                   ;
 ;
 ;
-
-
-;; (struct/con ({Identifier : Identifier} ...))
-;; identifier to the right of the colon names the predicate
-
-;; the struct/con form creates a struct type defn whose constructor ensures
-;; that the respective field values satisfy the named predicate
-
-;; note that Racket's `struct` comes with guards
-;; the point on this exercise is that you may use struct
-;; but not its guard feature. instead override the struct constructor
-
-
-;; hints:
-
-;; 1) it is possible to set! a function name (but not required for this problem)
-;; 2) Use `begin` to splice a sequence of code into a context
-
 
 
 ;; examples
@@ -277,10 +253,7 @@
 (define-for-syntax (make-struct-pred stx snme ps)
   (define predicate (string->syntax (string-append (syntax->string snme) "?") stx))
   #`(define #,predicate
-      (λ (s) (and (eqv? #,snme (car s))
-                  (for ([field (cdr s)]
-                        [p ps])
-                    (p field))))))
+      (λ (s) (eqv? (quote #,snme) (car s)))))
 
 
 (define-syntax (struct/con stx)
@@ -324,17 +297,25 @@
 
 
 (module+ test
-  (struct/con pair ({m : number?} {n : number?}))
-  (check-equal? (pair? (pair 1 0)) #t)
-  (check-equal? (pair? `(pair 2 2)) #f)
-  (check-exn (regexp "struct/con: expr 'x did not pass predicate #<procedure:number\\?>")
-              (λ () (pair? (pair 'x 0))))
 
+  (struct/con major ({sid : number?}
+                     {sname : string?}
+                     {major : string?}))
+
+  (major 1 "Joshua" "CS")
+  (major 2 "Fred"   "CS")
+
+
+  (check-exn (regexp "struct/con: expr 'dogs did not pass predicate #<procedure:string?\\?>")
+             (λ () (major 3 'dogs 55)))
+  
+  (check-exn
+   (regexp "struct/con: expr \"Joshua\" did not pass predicate #<procedure:number\\?>")
+   (λ () (major "Joshua" 3 14)))
+
+  
   (struct/con abc ({x : zero?} {y : symbol?}))
-  #;(define non-ex (abc 1 'z))
-
-  
-  
+ 
   (define ex (abc 0 'x))
   
   (struct/con eval-once-test ({xs : list?} {ys : list?}))
@@ -349,8 +330,7 @@
                      (set! my-xs (cons 'b my-xs))
                      my-xs))
    '(eval-once-test (a) (b a)))
-  
-  
+   
   (check-exn (regexp "struct/con: expr 0 did not pass predicate #<procedure:symbol\\?>")
              (λ () (abc 0 0)))
 
@@ -359,7 +339,6 @@
   
   (check-exn (regexp "struct/con: expr 1 did not pass predicate #<procedure:zero\\?>")
              (λ () (abc 1 'z)))
-
 
   (struct/con abcd ({x : zero?}
                     {y : symbol?}
