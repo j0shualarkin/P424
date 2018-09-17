@@ -64,7 +64,7 @@
 ;; we tried a few different implementations (without using set!)
 ;; before arriving to the above definition!
 
-#; 
+#;
 (define-syntax all
   (syntax-parser
     [(_ e)
@@ -124,6 +124,7 @@
 (check-equal?
  (all 42 "dogs" (λ (x) x))
  (list 42 "dogs" (λ (x) x)))
+
 (module+ test
   (require rackunit)
   (check-equal?
@@ -226,7 +227,7 @@
   (symbol->string (syntax->datum stx)))
 
 
-;; string->syntax : String -> Syntax 
+;; string->syntax : String -> Syntax
 ;; inverse function of above, requires a context
 (define-for-syntax (string->syntax str stx)
   (datum->syntax stx (string->symbol str)))
@@ -241,7 +242,7 @@
        (string->syntax (string-append (syntax->string snme) "-"
                                       (syntax->string fnme))
                        stx))
-     #`(define 
+     #`(define
          #,field-getter
          (λ (inst) (list-ref inst (add1 #,indx)))))
    field-names
@@ -263,47 +264,41 @@
                  (eqv? (quote #,snme) (car s))))))
 
 
+(define-for-syntax (get-vals preds exprs)
+  (map (λ (p e)
+         #`(or (let ([v #,e])
+                 (if (#,p v) v
+                     #f))
+               (error 'struct/con "expr ~v did not pass predicate ~v" #,e #,p)))
+       (syntax->list preds)
+       (syntax->list exprs)))
+
 ;; struct/con : Syntax -> Syntax
 ;; behaves like struct in racket but maintains contracts on
 ;; the values given to an instance of the struct
 (define-syntax (struct/con stx)
   (syntax-parse stx #:datum-literals (:)
     [(_ struct-name ({f1 : p1} ...))
-     
+
      (define ps (map syntax->datum (syntax->list #'(p1 ...))))
-     (define ps-len (length ps))
-
-     (define vs
-       (for/list ([i ps-len])
-         (string->symbol (string-append "v-" (number->string i)))))
-
-     (define vs-stx (datum->syntax #'struct-name vs))
-
-     (define struct-vals
-       (map (λ (p e)
-              #`(or (let ([v #,e])
-                      (if (#,p v) v
-                          #f))
-                    (error 'struct/con "expr ~v did not pass predicate ~v" #,e #,p)))
-            ps
-            (syntax->list vs-stx)))
 
      (define predicate (make-struct-pred stx #'struct-name #'(p1 ...)))
      (define accessors (accessify        stx #'struct-name #'(f1 ...)))
-     
+
      #`(begin
          #,predicate
          #,@accessors
          (define-syntax (struct-name stx)
            (syntax-parse stx
-             [(struct-name #,@vs-stx)
-              #'(list (quote struct-name) #,@struct-vals)])))]))
-
+             [(struct-name val (... ...))
+              (define struct-vals (get-vals #'(p1 ...) #'(val (... ...))))
+              #`(list (quote struct-name) (... #,@struct-vals))])))]))
 
 
 (struct/con interesting-example ({f1 : number?}))
 (interesting-example (begin (displayln 'once)
                             10))
+
 
 
 (module+ test
@@ -326,17 +321,17 @@
 
   (check-exn (regexp "struct/con: expr 'dogs did not pass predicate #<procedure:string?\\?>")
              (λ () (major 3 'dogs 55)))
-  
+
   (check-exn
    (regexp "struct/con: expr \"Joshua\" did not pass predicate #<procedure:number\\?>")
    (λ () (major "Joshua" 3 14)))
 
   ;; -------------------------
-  
+
   (struct/con eval-once-test ({xs : list?} {ys : list?}))
-  
+
   (define my-xs '())
-  
+
   (check-equal?
    (eval-once-test (begin
                      (set! my-xs (cons 'a my-xs))
@@ -347,21 +342,21 @@
    '(eval-once-test (a) (b a)))
 
   ;; -------------------
-  
+
   (struct/con pair ({x : zero?} {y : symbol?}))
- 
+
 
   (check-exn (regexp "struct/con: expr 0 did not pass predicate #<procedure:symbol\\?>")
              (λ () (pair 0 0)))
 
   (check-exn (regexp "struct/con: expr 1 did not pass predicate #<procedure:zero\\?>")
              (λ () (pair 1 0)))
-  
+
   (check-exn (regexp "struct/con: expr 1 did not pass predicate #<procedure:zero\\?>")
              (λ () (pair 1 'z)))
 
   ;; -------------------------
-  
+
   (struct/con abcd ({x : zero?}
                     {y : symbol?}
                     {z : string?}))
@@ -370,8 +365,29 @@
 
   (check-exn (regexp "struct/con: expr 120 did not pass predicate #<procedure:string\\?>")
              (λ () (abcd 0 'a 120)))
-  
+
   (check-equal? (abcd-x ex2) 0)
   (check-equal? (abcd-y ex2) 'z)
   (check-equal? (abcd-z ex2) "dogs"))
 
+(define-for-syntax (pair stx defs vals)
+  (map (λ (x y)
+         ;;(define x-stx (datum->syntax stx (syntax->datum x)))
+         #`(define #,x #,y))
+       (syntax->list defs)
+       (syntax->list vals)))
+(define-syntax (hello stx)
+  (syntax-parse stx
+    [(_ world vals ...)
+     #`(define-syntax (world stx)
+         (syntax-parse stx
+           [(_ def (... ...))
+            #;
+            #`(begin (define v 10) (... ...))
+            (define def-vals (pair stx #'(def (... ...)) #'(vals ...)))
+            #`(begin (... #,@def-vals)) ]))]))
+
+;; (hello world 10 20)
+;; (world a b)
+;; a
+;; b
