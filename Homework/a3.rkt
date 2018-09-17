@@ -1,6 +1,5 @@
 #lang racket
 
-
 ;
 ;
 ;
@@ -20,8 +19,7 @@
 ;                   ;                       ;
 ;
 
-
-
+(require (for-syntax syntax/parse))
 
 ;
 ;
@@ -46,18 +44,27 @@
 
 ;; (all Expression ...)
 ;; if all of the expressions evaluate to a non-#false value
-;; all produces the list of resulsts not including any values which are #true
+;; all produces the list of resulsts excluding #true values
+;; otherwise all produces #false immediately after seeing a not-true value
 
-;; otherwise all produces #false
+;; all : Syntax -> Syntax
+(define-syntax all
+  (syntax-parser
+    [(_ e ...) #'(let ([v #t]
+                       [result '()])
+                   (if v (begin
+                           (set! v e)
+                           (when (and v (not (eq? v #t)))
+                             (set! result (append result (list v)))))
+                       #f)
+                   ...
+                   (if v result #f))]))
 
-;; the all form should short-circuit (not print anything)
 
-;(all #false (print 'hi))
+;; we tried a few different implementations (without using set!)
+;; before arriving to the above definition!
 
-(require (for-syntax syntax/parse
-                     racket/match
-                     racket/bool))
-#;
+#; 
 (define-syntax all
   (syntax-parser
     [(_ e)
@@ -106,25 +113,13 @@
 (define-syntax-rule (all e ...)
   (all- '() e ...))
 
-(define-syntax all
-  (syntax-parser
-    [(_ e ...) #'(let ([v #t]
-                       [result '()])
-                   (if v (begin
-                           (set! v e)
-                           (when (and v (not (eq? v #t)))
-                             (set! result (append result (list v)))))
-                       #f)
-                   ...
-                   (if v result #f))]))
-
 
 #;
 (all #t #t #t #f (begin (displayln "heheh") 20))
 ;; had to comment this test out since
 ;; function equality isn't easy to check
 ;; but it says there's a procedure in the right place,
-;; so I'm assuming the test passes for all intents and purposes
+;; so we're assuming the test passes for all intents and purposes
 #;
 (check-equal?
  (all 42 "dogs" (λ (x) x))
@@ -145,6 +140,7 @@
 
   (define li (list))
 
+  ;; the case that brought us to the final definition
   (check-equal? (all #t
                      (begin
                        (set! li (cons 'a li))
@@ -224,15 +220,21 @@
 ;; (kons knil knil)
 ;; (kons 5 'dogs)
 
+;; syntax->string : Syntax -> String
+;; helper function to simplify function name generation
 (define-for-syntax (syntax->string stx)
   (symbol->string (syntax->datum stx)))
 
+
+;; string->syntax : String -> Syntax 
+;; inverse function of above, requires a context
 (define-for-syntax (string->syntax str stx)
   (datum->syntax stx (string->symbol str)))
 
-
+;; accessify : Syntax -> Syntax -> Syntax -> (Listof Syntax)
+;; generates accesor functions for the given structs name & its fields' names
 (define-for-syntax (accessify stx snme fnme)
-  (define ls-stx (syntax->list fnme))
+  (define field-names (syntax->list fnme))
   (map
    (λ (fnme indx)
      (define field-getter
@@ -242,20 +244,28 @@
      #`(define 
          #,field-getter
          (λ (inst) (list-ref inst (add1 #,indx)))))
-   ;; field names
-   ls-stx
-   ;; indices
-   (for/list ([s (length ls-stx)])
+   field-names
+   ;; indexing into the values present in a instance of a struct
+   (for/list ([s (length field-names)])
      s)))
 
 
-
+;; make-struct-pred : Syntax -> Syntax -> Syntax -> Syntax
+;; generates a predicate for an instance of a struct
+;; writing a purpose statement for a function that checks if something
+;; is an instance of a type is like existence,
+;; is the purpose statement of a predicate philosophical then? ^.^
 (define-for-syntax (make-struct-pred stx snme ps)
   (define predicate (string->syntax (string-append (syntax->string snme) "?") stx))
   #`(define #,predicate
-      (λ (s) (eqv? (quote #,snme) (car s)))))
+      (λ (s) (if (not (list? s))
+                 (error (quote #,predicate) "expected a ~v got ~v" (quote #,snme) s)
+                 (eqv? (quote #,snme) (car s))))))
 
 
+;; struct/con : Syntax -> Syntax
+;; behaves like struct in racket but maintains contracts on
+;; the values given to an instance of the struct
 (define-syntax (struct/con stx)
   (syntax-parse stx #:datum-literals (:)
     [(_ struct-name ({f1 : p1} ...))
@@ -269,7 +279,7 @@
 
      (define vs-stx (datum->syntax #'struct-name vs))
 
-     (define rands
+     (define struct-vals
        (map (λ (p e)
               #`(or (let ([v #,e])
                       (if (#,p v) v
@@ -282,28 +292,36 @@
      (define accessors (accessify        stx #'struct-name #'(f1 ...)))
      
      #`(begin
-        #,predicate
+         #,predicate
          #,@accessors
-           (define-syntax (struct-name stx)
-               (syntax-parse stx
-                 [(struct-name #,@vs-stx)
-                  #'(list (quote struct-name) #,@rands)])))]))
+         (define-syntax (struct-name stx)
+           (syntax-parse stx
+             [(struct-name #,@vs-stx)
+              #'(list (quote struct-name) #,@struct-vals)])))]))
 
 
 
-;(struct/con interesting-example ({f1 : number?}))
-;(interesting-example (begin (displayln 'once)
-;                            10))
+(struct/con interesting-example ({f1 : number?}))
+(interesting-example (begin (displayln 'once)
+                            10))
 
 
 (module+ test
-
+  ;; when databases hw and 424 hw meetup
   (struct/con major ({sid : number?}
                      {sname : string?}
                      {major : string?}))
 
-  (major 1 "Joshua" "CS")
-  (major 2 "Fred"   "CS")
+  (define F (major 1 "Fred"   "CS"))
+  (define J (major 2 "Joshua" "CS"))
+
+  (check-equal? (major-sid F) 1)
+  (check-equal? (major-sname J) "Joshua")
+  (check-equal? (string-append
+                 (major-major F)
+                 (major-major J))
+                "CSCS")
+  (check-equal? (major? F) #t)
 
 
   (check-exn (regexp "struct/con: expr 'dogs did not pass predicate #<procedure:string?\\?>")
@@ -313,10 +331,7 @@
    (regexp "struct/con: expr \"Joshua\" did not pass predicate #<procedure:number\\?>")
    (λ () (major "Joshua" 3 14)))
 
-  
-  (struct/con abc ({x : zero?} {y : symbol?}))
- 
-  (define ex (abc 0 'x))
+  ;; -------------------------
   
   (struct/con eval-once-test ({xs : list?} {ys : list?}))
   
@@ -330,16 +345,23 @@
                      (set! my-xs (cons 'b my-xs))
                      my-xs))
    '(eval-once-test (a) (b a)))
-   
+
+  ;; -------------------
+  
+  (struct/con pair ({x : zero?} {y : symbol?}))
+ 
+
   (check-exn (regexp "struct/con: expr 0 did not pass predicate #<procedure:symbol\\?>")
-             (λ () (abc 0 0)))
+             (λ () (pair 0 0)))
 
   (check-exn (regexp "struct/con: expr 1 did not pass predicate #<procedure:zero\\?>")
-             (λ () (abc 1 0)))
+             (λ () (pair 1 0)))
   
   (check-exn (regexp "struct/con: expr 1 did not pass predicate #<procedure:zero\\?>")
-             (λ () (abc 1 'z)))
+             (λ () (pair 1 'z)))
 
+  ;; -------------------------
+  
   (struct/con abcd ({x : zero?}
                     {y : symbol?}
                     {z : string?}))
