@@ -109,6 +109,20 @@
                                         (append acc (list v1)))
                                     e ...)
                               #f))]))
+
+#;
+(define-syntax all-th
+  (syntax-parser
+    [(_ e ...) #`(let/cc k (foldl (λ (th almost)
+                                    (let ([v (th)])
+                                      (if v
+                                          (if (eqv? v #t) almost
+                                              (append almost (list v)))
+                                          (k #f))))
+                                  '()
+                                  (list (λ () e) ...)))]))
+
+
 #;
 (define-syntax-rule (all e ...)
   (all- '() e ...))
