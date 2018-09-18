@@ -280,10 +280,9 @@
 
 (define-for-syntax (get-vals preds exprs)
   (map (λ (p e)
-         #`(or (let ([v #,e])
-                 (if (#,p v) v
-                     #f))
-               (error 'struct/con "expr ~v did not pass predicate ~v" #,e #,p)))
+         #`(let ([v #,e])
+             (if (#,p v) v
+                 (error 'struct/con "expr ~v did not pass predicate ~v" #,e #,p))))
        (syntax->list preds)
        (syntax->list exprs)))
 
@@ -292,21 +291,21 @@
 ;; the values given to an instance of the struct
 (define-syntax (struct/con stx)
   (syntax-parse stx #:datum-literals (:)
-    [(_ struct-name ({f1 : p1} ...))
+                [(_ struct-name:id ({f1:id : p1} ...))
 
-     (define ps (map syntax->datum (syntax->list #'(p1 ...))))
+                 (define ps (map syntax->datum (syntax->list #'(p1 ...))))
 
-     (define predicate (make-struct-pred stx #'struct-name #'(p1 ...)))
-     (define accessors (accessify        stx #'struct-name #'(f1 ...)))
+                 (define predicate (make-struct-pred stx #'struct-name #'(p1 ...)))
+                 (define accessors (accessify        stx #'struct-name #'(f1 ...)))
 
-     #`(begin
-         #,predicate
-         #,@accessors
-         (define-syntax (struct-name stx)
-           (syntax-parse stx
-             [(struct-name val (... ...))
-              (define struct-vals (get-vals #'(p1 ...) #'(val (... ...))))
-              #`(list (quote struct-name) (... #,@struct-vals))])))]))
+                 #`(begin
+                     #,predicate
+                     #,@accessors
+                     (define-syntax (struct-name stx)
+                       (syntax-parse stx
+                         [(struct-name val (... ...))
+                          (define struct-vals (get-vals #'(p1 ...) #'(val (... ...))))
+                          #`(list (quote struct-name) (... #,@struct-vals))])))]))
 
 
 (struct/con interesting-example ({f1 : number?}))
@@ -324,6 +323,8 @@
   (define F (major 1 "Fred"   "CS"))
   (define J (major 2 "Joshua" "CS"))
 
+  (struct/con klass ({sid : boolean?}))
+  (check-equal? (klass-sid (klass #f)) #f)
   (check-equal? (major-sid F) 1)
   (check-equal? (major-sname J) "Joshua")
   (check-equal? (string-append
