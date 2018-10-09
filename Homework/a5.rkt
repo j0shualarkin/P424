@@ -2,7 +2,8 @@
 
 (require syntax/parse)
 (require (for-syntax syntax/parse racket/list)
-         (rename-in racket (let orig-let)))
+         (rename-in racket (let orig-let)
+                    [#%app orig-#%app]))
 (provide let)
 
 (begin-for-syntax
@@ -37,8 +38,18 @@
      (if (empty? bindings^) #`#,body^
          #`(orig-let #,bindings^ #,body^))]))
 
-;; (syntax-parse #'()
-;;   ['() 10])
+(define-syntax (#%app stx)
+  (syntax-parse stx #:literals (lambda)
+    [(_ op n:number r:number ...)
+     (let ([val (apply (eval-syntax #'op) (syntax->datum #'n) (map syntax->datum (syntax->list #'(r ...))))])
+       (quasisyntax (unsyntax val)))]
+    [(_ (lambda (x ...) body) rand ...)
+     #'(let ([x rand]
+             ...)
+         body)]
+    [(_ op rand ...)
+     #'(orig-#%app op rand ...)]))
+
 
 (module+ test
   (require rackunit)
@@ -56,7 +67,7 @@
                       [y 20]
                       [w 20]
                       [z "20"])
-                  ((λ (m n) (+ 50 m n x y w))
+                  ((lambda (m n) (+ 50 m n x y w))
                    (+ x y (string->number z))
                    100))
                 250))
