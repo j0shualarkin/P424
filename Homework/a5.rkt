@@ -2,7 +2,7 @@
 
 (require (for-syntax syntax/parse racket/list)
          (rename-in racket (let orig-let)))
-(provide (rename-out [let let]))
+(provide let)
 
 (begin-for-syntax
   (define-syntax-class const
@@ -10,15 +10,13 @@
     (pattern c:string)
     (pattern c:boolean))
   (define (subst stx var-id const-expr)
-
     (syntax-parse stx #:literals (λ)
-      [var:id #:when (free-identifier=? #'var var-id) const-expr]
-      [(λ (x:id ...) body) #`(λ (x ...) #,(subst #'body var-id const-expr))]
-      [(e0 er ...) (define data (map (λ (x) (subst x var-id const-expr))
-                                     (syntax->list #'(e0 er ...))))
-                  #`(#,@data)]
-      [_ stx])))
-
+                  [var:id #:when (free-identifier=? #'var var-id) const-expr]
+                  [(λ (x:id ...) body) #`(λ (x ...) #,(subst #'body var-id const-expr))]
+                  [(e0 er ...) (define data (map (λ (x) (subst x var-id const-expr))
+                                                 (syntax->list #'(e0 er ...))))
+                               #`(#,@data)]
+                  [_ stx])))
 
 
 (define-syntax (let stx)
