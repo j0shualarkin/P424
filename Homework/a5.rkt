@@ -2,9 +2,9 @@
 
 (require syntax/parse)
 (require (for-syntax syntax/parse racket/list)
-         (rename-in racket (let orig-let)
-                    [#%app orig-#%app]))
-(provide let)
+         (rename-in racket (let orig-let)))
+(provide (rename-out [myapp #%app])
+         let #%module-begin #%top lambda + - * / quotient modulo add1 sub1 abs #%datum)
 
 (begin-for-syntax
   (define-syntax-class const
@@ -23,7 +23,7 @@
 
   (define (subst-bindings bindings body store)
     (syntax-parse bindings #:literals (λ)
-                  [() (values body store)]
+                  [() (cons body store)]
                   [([x:id rhs:const] r ...)
                    (subst-bindings #'(r ...) (subst body #'x #'rhs) store)]
                   [([x:id y:id] r ...) (subst-bindings #'(r ...) (subst body #'x #'y) store)]
@@ -33,22 +33,28 @@
 
 (define-syntax (let stx)
   (syntax-parse stx
-    [(_ bindings body)
-     (define-values (body^ bindings^) (subst-bindings #'bindings #'body '()))
-     (if (empty? bindings^) #`#,body^
-         #`(orig-let #,bindings^ #,body^))]))
+    [(_ bindings body r ...)
+     (define result (map (λ (bdy) (subst-bindings #'bindings bdy '())) (cons #'body (syntax->list #'(r ...)))))
+     (define bindings^ (append* (map cdr result)))
+     (define body+^ (map car result))
+     (if (empty? bindings^) #`(begin #,@body+^)
+         #`(orig-let #,bindings^ #,@body+^))]))
 
-(define-syntax (#%app stx)
+(define-for-syntax optbl (for/hash ([i (in-list '(+ - * / abs))]
+                                    [v (in-list (list + - * / abs))])
+                           (values i v)))
+(define-syntax (myapp stx)
   (syntax-parse stx #:literals (lambda)
-    [(_ op n:number r:number ...)
-     (let ([val (apply (eval-syntax #'op) (syntax->datum #'n) (map syntax->datum (syntax->list #'(r ...))))])
-       (quasisyntax (unsyntax val)))]
-    [(_ (lambda (x ...) body) rand ...)
-     #'(let ([x rand]
-             ...)
-         body)]
-    [(_ op rand ...)
-     #'(orig-#%app op rand ...)]))
+                [(_ op n:number r:number ...)
+                 (let ([val (apply (hash-ref optbl (syntax->datum #'op)) (syntax->datum #'n) (map syntax->datum (syntax->list #'(r ...))))])
+                   #`#,val)]
+                [(_ (lambda (x ...) body) rand ...)
+                 #'(let ([x rand]
+                         ...)
+                     body)]
+                [(_ op rand ...)
+                 #'(orig-#%app op rand ...)]))
+
 
 
 (module+ test
